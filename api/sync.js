@@ -48,6 +48,29 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (req.method === 'DELETE') {
+    const { name, passwordHash } = req.query;
+    if (typeof name !== 'string' || !name.trim()) {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
+    const key = `team:${name}`;
+    const getResp = await fetch(`${kvUrl}/get/${encodeURIComponent(key)}`, { headers });
+    const getData = await getResp.json();
+    const existing = getData.result ? JSON.parse(getData.result) : null;
+
+    if (existing && existing.passwordHash && existing.passwordHash !== passwordHash) {
+      res.status(403).json({ error: 'password mismatch' });
+      return;
+    }
+
+    await fetch(`${kvUrl}/del/${encodeURIComponent(key)}`, { method: 'POST', headers });
+    await fetch(`${kvUrl}/srem/team-index/${encodeURIComponent(name)}`, { headers });
+
+    res.status(200).json({ ok: true });
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'method not allowed' });
     return;

@@ -1161,26 +1161,37 @@
 
     // 削除はこの端末のローカル表示からのみ除外する(サーバー側のデータは消さない)
     async function deleteTallyWithAuth(targetName) {
-      const currentNames = getTallyNames();
-      if (!currentNames.includes(targetName)) {
-        alert('この集計はこの端末にはまだ保存されていません');
-        return;
-      }
-      if (currentNames.length <= 1) {
-        alert('最後の1件は削除できません');
-        return;
-      }
       const auth = await authenticateTeam(targetName);
       if (auth === null) return;
-      if (!confirm(`集計「${targetName}」をこの端末の一覧から削除しますか？(サーバー上のデータは残ります)`)) return;
+      if (!confirm(`集計「${targetName}」を削除しますか？サーバーからも削除され、他の端末からも見えなくなります。この操作は元に戻せません`)) return;
 
-      const updatedNames = currentNames.filter(n => n !== targetName);
-      setTallyNames(updatedNames);
+      const password = getTallyPassword(targetName);
+      const passwordHash = password ? hashPassword(password) : '';
+      try {
+        const delResp = await fetch(`/api/sync?name=${encodeURIComponent(targetName)}&passwordHash=${encodeURIComponent(passwordHash)}`, { method: 'DELETE' });
+        if (delResp.status === 403) {
+          alert('サーバー側に保存されているパスワードと一致しません');
+          return;
+        }
+        if (!delResp.ok) {
+          alert('サーバーからの削除に失敗しました');
+          return;
+        }
+      } catch (e) {
+        alert('通信エラーが発生しました。電波状況をご確認ください');
+        return;
+      }
+
+      const updatedNames = getTallyNames().filter(n => n !== targetName);
+      setTallyNames(updatedNames.length ? updatedNames : ['デフォルト']);
       localStorage.removeItem(KEY_STATE_PREFIX + targetName);
       localStorage.removeItem(KEY_PASSWORD_PREFIX + targetName);
 
       if (activeName === targetName) {
-        switchTally(updatedNames[0]);
+        if (!updatedNames.length) {
+          setTallyState('デフォルト', { count: 0, unitPrice: 100 });
+        }
+        switchTally(updatedNames[0] || 'デフォルト');
       } else {
         openSwitchModal();
       }
