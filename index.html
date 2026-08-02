@@ -967,6 +967,9 @@
       }
     }
 
+    // QR/共有URL経由で開いたセッションでは、他の既存集計への切替を禁止する(このチームの集計だけに限定)
+    let qrRestrictedMode = false;
+
     if (urlState && !urlRestoreBlocked) {
       if (urlState.name) {
         activeName = urlState.name;
@@ -974,12 +977,13 @@
           names.push(activeName);
           setTallyNames(names);
         }
+        qrRestrictedMode = true;
       }
 
       const currentState = getTallyState(activeName);
       const updatedCount = (urlState.count !== null) ? urlState.count : currentState.count;
       const updatedUnitPrice = (urlState.unitPrice !== null) ? urlState.unitPrice : currentState.unitPrice;
-      
+
       setTallyState(activeName, { count: updatedCount, unitPrice: updatedUnitPrice });
       setActiveName(activeName);
     }
@@ -1054,7 +1058,8 @@
     // --- 集計切替・作成機能 ---
     function renderTallyList() {
       tallyListEl.innerHTML = '';
-      const currentNames = getTallyNames();
+      // QR経由のセッションでは、他の既存集計を一覧に出さない(このチームの集計だけに限定)
+      const currentNames = qrRestrictedMode ? [activeName] : getTallyNames();
       currentNames.forEach(name => {
         const item = document.createElement('div');
         item.className = 'tally-item' + (name === activeName ? ' active' : '');
@@ -1105,6 +1110,10 @@
 
     // 削除も切替と同じくパスワード必須(パスワード未設定分は無条件で許可)
     function deleteTallyWithAuth(targetName) {
+      if (qrRestrictedMode && targetName !== activeName) {
+        alert('QR経由で開いたこのチームの集計以外へは操作できません');
+        return;
+      }
       const currentNames = getTallyNames();
       if (currentNames.length <= 1) {
         alert('最後の1件は削除できません');
@@ -1135,6 +1144,10 @@
 
     // パスワード未設定の集計(旧データからの移行分など)はそのまま切替を許可する
     function switchTallyWithAuth(targetName) {
+      if (qrRestrictedMode && targetName !== activeName) {
+        alert('QR経由で開いたこのチームの集計以外へは切り替えられません');
+        return;
+      }
       const requiredPassword = getTallyPassword(targetName);
       if (requiredPassword) {
         const input = prompt(`集計「${targetName}」のパスワードを入力してください`);
