@@ -212,7 +212,7 @@
 
     .sub-buttons {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
       gap: 8px;
     }
 
@@ -448,6 +448,7 @@
       <div class="sub-buttons">
         <button type="button" class="btn secondary-btn" id="btnMinus">1つ戻す</button>
         <button type="button" class="btn share-btn" id="btnShare">共有</button>
+        <button type="button" class="btn secondary-btn" id="btnSync">同期</button>
         <button type="button" class="btn danger-btn" id="btnReset">リセット</button>
       </div>
     </div>
@@ -494,6 +495,25 @@
           <button type="button" class="primary-btn-sm" id="btnCopy">コピー</button>
         </div>
         <div class="toast-msg" id="toastMsg" style="display: none;">URLをコピーしました！</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 同期モーダル -->
+  <div class="modal-overlay" id="syncModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>サーバーとの同期</h2>
+        <button type="button" class="close-btn" id="btnCloseSyncModal">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="font-size: 0.9375rem; color: var(--text-sub); line-height: 1.6;">
+          サーバー上の集計「<strong id="syncTallyName" style="color: var(--text-main);"></strong>」<br>
+          カウント: <strong id="syncServerCount" style="color: var(--text-main);"></strong> /
+          単価: <strong id="syncServerPrice" style="color: var(--text-main);"></strong>円
+        </div>
+        <button type="button" class="primary-btn" id="btnSyncPull" style="font-size: 1.125rem; padding: 14px;">サーバーの内容を取り込む</button>
+        <button type="button" class="btn secondary-btn" id="btnSyncPush">この端末の内容をサーバーへ送信する</button>
       </div>
     </div>
   </div>
@@ -884,7 +904,6 @@
       const nameParam = params.get('n');
       const cParam = params.get('c');
       const pParam = params.get('p');
-      const hParam = params.get('h');
 
       let restoredName = null;
       let cVal = null;
@@ -918,7 +937,7 @@
         window.history.replaceState({}, document.title, cleanUrl);
       }
 
-      return hasUrlParams ? { name: restoredName, count: cVal, unitPrice: pVal, passwordHash: hParam } : null;
+      return hasUrlParams ? { name: restoredName, count: cVal, unitPrice: pVal } : null;
     }
 
     // パスワードを簡易ハッシュ化(16進文字列)。QR/URLには平文パスワードを含めないため
@@ -934,58 +953,69 @@
       return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
     }
 
+    // サーバー(DB)へチームのパスワードを照合する。パスワード未設定のチームは入力なしでそのまま通る
+    async function fetchTeamFromServer(name, passwordHash) {
+      try {
+        const resp = await fetch(`/api/sync?name=${encodeURIComponent(name)}&passwordHash=${encodeURIComponent(passwordHash || '')}`);
+        if (resp.status === 404) return { status: 'notfound' };
+        if (resp.status === 403) return { status: 'forbidden' };
+        if (!resp.ok) return { status: 'error' };
+        const data = await resp.json();
+        return { status: 'ok', count: data.count, unitPrice: data.unitPrice };
+      } catch (e) {
+        return { status: 'error' };
+      }
+    }
+
+    // 切替・QR引き継ぎで共通利用する認証処理。成功したパスワードは次回オフライン時のためローカルにも保存する
+    async function authenticateTeam(name) {
+      let result = await fetchTeamFromServer(name, '');
+      if (result.status === 'forbidden') {
+        const input = prompt(`集計「${name}」のパスワードを入力してください`);
+        if (input === null) return null;
+        result = await fetchTeamFromServer(name, hashPassword(input));
+        if (result.status === 'forbidden') {
+          alert('パスワードが違います');
+          return null;
+        }
+        if (result.status === 'ok') {
+          setTallyPassword(name, input);
+        }
+      }
+      if (result.status === 'error') {
+        alert('通信エラーが発生しました。電波状況をご確認ください');
+        return null;
+      }
+      return result;
+    }
+
     // --- アプリ初期化 ---
+    (async function initApp() {
     migrateAndInitData();
     const urlState = restoreFromUrl();
 
     let names = getTallyNames();
     let activeName = getActiveName();
 
-    // URL共有から開かれた場合の復元・新規追加・アクティブ化
-    // 共有URL自体にパスワードのハッシュ値が含まれていれば、端末を問わず必ず入力を求める(素通し防止)
-    let urlRestoreBlocked = false;
+    // URL共有(QR引き継ぎ)から開かれた場合、切替時と同じくサーバーでパスワードを照合してから復元する
     if (urlState && urlState.name) {
-      if (urlState.passwordHash) {
-        const input = prompt(`集計「${urlState.name}」のパスワードを入力してください`);
-        if (input === null || hashPassword(input) !== urlState.passwordHash) {
-          if (input !== null) alert('パスワードが違います');
-          urlRestoreBlocked = true;
-        } else {
-          // 認証成功: この端末でも同じパスワードで切替できるよう保存
-          setTallyPassword(urlState.name, input);
-        }
-      } else {
-        // 旧形式のURL(ハッシュなし)向けフォールバック: この端末が既にパスワードを知っている場合のみ照合
-        const requiredPassword = names.includes(urlState.name) ? getTallyPassword(urlState.name) : null;
-        if (requiredPassword) {
-          const input = prompt(`集計「${urlState.name}」のパスワードを入力してください`);
-          if (input !== requiredPassword) {
-            if (input !== null) alert('パスワードが違います');
-            urlRestoreBlocked = true;
-          }
-        }
-      }
-    }
-
-    // QR/共有URL経由で開いたセッションでは、他の既存集計への切替を禁止する(このチームの集計だけに限定)
-    let qrRestrictedMode = false;
-
-    if (urlState && !urlRestoreBlocked) {
-      if (urlState.name) {
+      const auth = await authenticateTeam(urlState.name);
+      if (auth !== null) {
         activeName = urlState.name;
         if (!names.includes(activeName)) {
           names.push(activeName);
           setTallyNames(names);
         }
-        qrRestrictedMode = true;
+
+        const currentState = getTallyState(activeName);
+        const baseCount = (auth.status === 'ok') ? auth.count : currentState.count;
+        const baseUnitPrice = (auth.status === 'ok') ? auth.unitPrice : currentState.unitPrice;
+        const updatedCount = (urlState.count !== null) ? urlState.count : baseCount;
+        const updatedUnitPrice = (urlState.unitPrice !== null) ? urlState.unitPrice : baseUnitPrice;
+
+        setTallyState(activeName, { count: updatedCount, unitPrice: updatedUnitPrice });
+        setActiveName(activeName);
       }
-
-      const currentState = getTallyState(activeName);
-      const updatedCount = (urlState.count !== null) ? urlState.count : currentState.count;
-      const updatedUnitPrice = (urlState.unitPrice !== null) ? urlState.unitPrice : currentState.unitPrice;
-
-      setTallyState(activeName, { count: updatedCount, unitPrice: updatedUnitPrice });
-      setActiveName(activeName);
     }
 
     // アクティブな状態の読み込み
@@ -1003,6 +1033,7 @@
     const btnMinus = document.getElementById('btnMinus');
     const btnReset = document.getElementById('btnReset');
     const btnShare = document.getElementById('btnShare');
+    const btnSync = document.getElementById('btnSync');
 
     const switchModalEl = document.getElementById('switchModal');
     const btnCloseSwitchModal = document.getElementById('btnCloseSwitchModal');
@@ -1056,11 +1087,9 @@
     });
 
     // --- 集計切替・作成機能 ---
-    function renderTallyList() {
+    function renderTallyList(teams) {
       tallyListEl.innerHTML = '';
-      // QR経由のセッションでは、他の既存集計を一覧に出さない(このチームの集計だけに限定)
-      const currentNames = qrRestrictedMode ? [activeName] : getTallyNames();
-      currentNames.forEach(name => {
+      teams.forEach(({ name, hasPassword }) => {
         const item = document.createElement('div');
         item.className = 'tally-item' + (name === activeName ? ' active' : '');
 
@@ -1070,7 +1099,7 @@
         nameSpan.addEventListener('click', () => switchTallyWithAuth(name));
         item.appendChild(nameSpan);
 
-        if (!getTallyPassword(name)) {
+        if (!hasPassword) {
           const setPasswordBtn = document.createElement('button');
           setPasswordBtn.type = 'button';
           setPasswordBtn.className = 'tally-delete-btn';
@@ -1105,30 +1134,45 @@
         return;
       }
       setTallyPassword(name, newPassword);
-      renderTallyList();
+      openSwitchModal();
     }
 
-    // 削除も切替と同じくパスワード必須(パスワード未設定分は無条件で許可)
-    function deleteTallyWithAuth(targetName) {
-      if (qrRestrictedMode && targetName !== activeName) {
-        alert('QR経由で開いたこのチームの集計以外へは操作できません');
+    // サーバー(DB)の全チーム一覧とこの端末が知っているチーム名をあわせて表示する
+    async function openSwitchModal() {
+      let serverTeams = [];
+      try {
+        const resp = await fetch('/api/sync?list=1');
+        if (resp.ok) {
+          const data = await resp.json();
+          serverTeams = data.teams || [];
+        }
+      } catch (e) {
+        // オフライン時はサーバー一覧を諦め、この端末が知っている集計だけ表示する
+      }
+      const serverNames = new Set(serverTeams.map(t => t.name));
+      // サーバーにまだ無いローカルのみの集計は、この端末のパスワード保存状況で補完する
+      const localOnlyTeams = getTallyNames()
+        .filter(name => !serverNames.has(name))
+        .map(name => ({ name, hasPassword: !!getTallyPassword(name) }));
+      const mergedTeams = [...serverTeams, ...localOnlyTeams];
+      renderTallyList(mergedTeams);
+      switchModalEl.style.display = 'flex';
+    }
+
+    // 削除はこの端末のローカル表示からのみ除外する(サーバー側のデータは消さない)
+    async function deleteTallyWithAuth(targetName) {
+      const currentNames = getTallyNames();
+      if (!currentNames.includes(targetName)) {
+        alert('この集計はこの端末にはまだ保存されていません');
         return;
       }
-      const currentNames = getTallyNames();
       if (currentNames.length <= 1) {
         alert('最後の1件は削除できません');
         return;
       }
-      const requiredPassword = getTallyPassword(targetName);
-      if (requiredPassword) {
-        const input = prompt(`集計「${targetName}」のパスワードを入力してください`);
-        if (input === null) return;
-        if (input !== requiredPassword) {
-          alert('パスワードが違います');
-          return;
-        }
-      }
-      if (!confirm(`集計「${targetName}」を削除しますか？この操作は元に戻せません`)) return;
+      const auth = await authenticateTeam(targetName);
+      if (auth === null) return;
+      if (!confirm(`集計「${targetName}」をこの端末の一覧から削除しますか？(サーバー上のデータは残ります)`)) return;
 
       const updatedNames = currentNames.filter(n => n !== targetName);
       setTallyNames(updatedNames);
@@ -1138,24 +1182,23 @@
       if (activeName === targetName) {
         switchTally(updatedNames[0]);
       } else {
-        renderTallyList();
+        openSwitchModal();
       }
     }
 
-    // パスワード未設定の集計(旧データからの移行分など)はそのまま切替を許可する
-    function switchTallyWithAuth(targetName) {
-      if (qrRestrictedMode && targetName !== activeName) {
-        alert('QR経由で開いたこのチームの集計以外へは切り替えられません');
+    // サーバー(DB)でパスワードを照合してから切替を許可する
+    async function switchTallyWithAuth(targetName) {
+      const auth = await authenticateTeam(targetName);
+      if (auth === null) {
         return;
       }
-      const requiredPassword = getTallyPassword(targetName);
-      if (requiredPassword) {
-        const input = prompt(`集計「${targetName}」のパスワードを入力してください`);
-        if (input === null) return;
-        if (input !== requiredPassword) {
-          alert('パスワードが違います');
-          return;
-        }
+      const names = getTallyNames();
+      if (!names.includes(targetName)) {
+        names.push(targetName);
+        setTallyNames(names);
+      }
+      if (auth.status === 'ok') {
+        setTallyState(targetName, { count: auth.count, unitPrice: auth.unitPrice });
       }
       switchTally(targetName);
     }
@@ -1172,10 +1215,9 @@
     }
 
     btnOpenSwitchModal.addEventListener('click', () => {
-      renderTallyList();
       newTallyInputEl.value = '';
       newTallyPasswordInputEl.value = '';
-      switchModalEl.style.display = 'flex';
+      openSwitchModal();
     });
 
     btnCloseSwitchModal.addEventListener('click', () => {
@@ -1186,30 +1228,51 @@
       if (e.target === switchModalEl) switchModalEl.style.display = 'none';
     });
 
-    btnCreateTally.addEventListener('click', () => {
+    btnCreateTally.addEventListener('click', async () => {
       const newName = newTallyInputEl.value.trim();
       if (!newName) return;
 
+      // サーバー上に同名チームが既に存在する場合は、新規作成ではなくパスワード照合で合流させる
+      const existsResult = await fetchTeamFromServer(newName, '');
+      if (existsResult.status === 'ok' || existsResult.status === 'forbidden') {
+        await switchTallyWithAuth(newName);
+        return;
+      }
+      if (existsResult.status === 'error') {
+        alert('通信エラーが発生しました。電波状況をご確認ください');
+        return;
+      }
+
+      const newPassword = newTallyPasswordInputEl.value;
+      if (!newPassword) {
+        alert('パスワードを設定してください');
+        return;
+      }
+      const passwordHash = hashPassword(newPassword);
+      const postResp = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, count: 0, unitPrice: 100, passwordHash }),
+      }).catch(() => null);
+      if (!postResp || !postResp.ok) {
+        alert('サーバーへの登録に失敗しました。電波状況をご確認ください');
+        return;
+      }
+
       const currentNames = getTallyNames();
       if (!currentNames.includes(newName)) {
-        const newPassword = newTallyPasswordInputEl.value;
-        if (!newPassword) {
-          alert('パスワードを設定してください');
-          return;
-        }
         currentNames.push(newName);
         setTallyNames(currentNames);
-        setTallyState(newName, { count: 0, unitPrice: 100 });
-        setTallyPassword(newName, newPassword);
       }
+      setTallyState(newName, { count: 0, unitPrice: 100 });
+      setTallyPassword(newName, newPassword);
       switchTally(newName);
     });
 
     // --- 共有機能 (QRコード・コピー) ---
     btnShare.addEventListener('click', () => {
-      const password = getTallyPassword(activeName);
-      const hashParam = password ? `&h=${hashPassword(password)}` : '';
-      const shareUrl = `${window.location.origin}${window.location.pathname}?n=${encodeURIComponent(activeName)}&c=${count}&p=${unitPrice}${hashParam}`;
+      // パスワードの照合はサーバー(DB)側で行うため、URLには名前とカウントのみ含める
+      const shareUrl = `${window.location.origin}${window.location.pathname}?n=${encodeURIComponent(activeName)}&c=${count}&p=${unitPrice}`;
       shareUrlInputEl.value = shareUrl;
       QRCodeGenerator.draw(shareUrl, qrCanvasEl, 5);
       shareModalEl.style.display = 'flex';
@@ -1218,6 +1281,97 @@
     btnCloseModal.addEventListener('click', () => {
       shareModalEl.style.display = 'none';
       toastMsgEl.style.display = 'none';
+    });
+
+    // サーバー(Vercel KV)との同期: 端末を交代するときに手動で押してもらう想定
+    const syncModalEl = document.getElementById('syncModal');
+    const btnCloseSyncModal = document.getElementById('btnCloseSyncModal');
+    const syncTallyNameEl = document.getElementById('syncTallyName');
+    const syncServerCountEl = document.getElementById('syncServerCount');
+    const syncServerPriceEl = document.getElementById('syncServerPrice');
+    const btnSyncPull = document.getElementById('btnSyncPull');
+    const btnSyncPush = document.getElementById('btnSyncPush');
+    let pendingSync = null;
+
+    async function pushToServer(passwordHash) {
+      const postResp = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: activeName, count, unitPrice, passwordHash }),
+      });
+      if (postResp.status === 403) {
+        alert('サーバー側に保存されているパスワードと一致しません');
+        return false;
+      }
+      if (!postResp.ok) {
+        alert('サーバーへの送信に失敗しました');
+        return false;
+      }
+      return true;
+    }
+
+    btnSyncPull.addEventListener('click', () => {
+      if (!pendingSync) return;
+      count = pendingSync.serverRecord.count;
+      unitPrice = pendingSync.serverRecord.unitPrice;
+      priceInputEl.value = unitPrice;
+      updateDisplay();
+      syncModalEl.style.display = 'none';
+      alert('サーバーの内容を取り込みました');
+      pendingSync = null;
+    });
+
+    btnSyncPush.addEventListener('click', async () => {
+      if (!pendingSync) return;
+      const ok = await pushToServer(pendingSync.passwordHash);
+      syncModalEl.style.display = 'none';
+      pendingSync = null;
+      if (ok) alert('サーバーへ送信しました');
+    });
+
+    btnCloseSyncModal.addEventListener('click', () => {
+      syncModalEl.style.display = 'none';
+      pendingSync = null;
+    });
+
+    syncModalEl.addEventListener('click', (e) => {
+      if (e.target === syncModalEl) {
+        syncModalEl.style.display = 'none';
+        pendingSync = null;
+      }
+    });
+
+    btnSync.addEventListener('click', async () => {
+      const password = getTallyPassword(activeName);
+      const passwordHash = password ? hashPassword(password) : '';
+
+      btnSync.disabled = true;
+      try {
+        const getResp = await fetch(`/api/sync?name=${encodeURIComponent(activeName)}&passwordHash=${encodeURIComponent(passwordHash)}`);
+
+        if (getResp.status === 403) {
+          alert('サーバー側に保存されているパスワードと一致しません');
+          return;
+        }
+
+        if (getResp.ok) {
+          const serverRecord = await getResp.json();
+          pendingSync = { serverRecord, passwordHash };
+          syncTallyNameEl.textContent = activeName;
+          syncServerCountEl.textContent = serverRecord.count;
+          syncServerPriceEl.textContent = serverRecord.unitPrice;
+          syncModalEl.style.display = 'flex';
+          return;
+        }
+
+        // サーバーに未登録(初回)の場合は選ぶまでもなく送信する
+        const ok = await pushToServer(passwordHash);
+        if (ok) alert('サーバーへ送信しました');
+      } catch (e) {
+        alert('通信エラーが発生しました。電波状況をご確認ください');
+      } finally {
+        btnSync.disabled = false;
+      }
     });
 
     shareModalEl.addEventListener('click', (e) => {
@@ -1248,6 +1402,7 @@
 
     // 初回描画
     updateDisplay();
+    })();
   </script>
 </body>
 </html>
