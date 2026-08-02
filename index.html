@@ -928,7 +928,21 @@
     let activeName = getActiveName();
 
     // URL共有から開かれた場合の復元・新規追加・アクティブ化
-    if (urlState) {
+    // 既存かつパスワード設定済みの集計を共有URL経由で開いた場合は、素通しにしないよう入力を求める
+    let urlRestoreBlocked = false;
+    if (urlState && urlState.name) {
+      const targetExists = names.includes(urlState.name);
+      const requiredPassword = targetExists ? getTallyPassword(urlState.name) : null;
+      if (requiredPassword) {
+        const input = prompt(`集計「${urlState.name}」のパスワードを入力してください`);
+        if (input !== requiredPassword) {
+          if (input !== null) alert('パスワードが違います');
+          urlRestoreBlocked = true;
+        }
+      }
+    }
+
+    if (urlState && !urlRestoreBlocked) {
       if (urlState.name) {
         activeName = urlState.name;
         if (!names.includes(activeName)) {
