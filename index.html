@@ -884,6 +884,7 @@
       const nameParam = params.get('n');
       const cParam = params.get('c');
       const pParam = params.get('p');
+      const hParam = params.get('h');
 
       let restoredName = null;
       let cVal = null;
@@ -917,7 +918,20 @@
         window.history.replaceState({}, document.title, cleanUrl);
       }
 
-      return hasUrlParams ? { name: restoredName, count: cVal, unitPrice: pVal } : null;
+      return hasUrlParams ? { name: restoredName, count: cVal, unitPrice: pVal, passwordHash: hParam } : null;
+    }
+
+    // パスワードを簡易ハッシュ化(16進文字列)。QR/URLには平文パスワードを含めないため
+    function hashPassword(password) {
+      let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+      for (let i = 0; i < password.length; i++) {
+        const c = password.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
     }
 
     // --- アプリ初期化 ---
@@ -928,16 +942,27 @@
     let activeName = getActiveName();
 
     // URL共有から開かれた場合の復元・新規追加・アクティブ化
-    // 既存かつパスワード設定済みの集計を共有URL経由で開いた場合は、素通しにしないよう入力を求める
+    // 共有URL自体にパスワードのハッシュ値が含まれていれば、端末を問わず必ず入力を求める(素通し防止)
     let urlRestoreBlocked = false;
     if (urlState && urlState.name) {
-      const targetExists = names.includes(urlState.name);
-      const requiredPassword = targetExists ? getTallyPassword(urlState.name) : null;
-      if (requiredPassword) {
+      if (urlState.passwordHash) {
         const input = prompt(`集計「${urlState.name}」のパスワードを入力してください`);
-        if (input !== requiredPassword) {
+        if (input === null || hashPassword(input) !== urlState.passwordHash) {
           if (input !== null) alert('パスワードが違います');
           urlRestoreBlocked = true;
+        } else {
+          // 認証成功: この端末でも同じパスワードで切替できるよう保存
+          setTallyPassword(urlState.name, input);
+        }
+      } else {
+        // 旧形式のURL(ハッシュなし)向けフォールバック: この端末が既にパスワードを知っている場合のみ照合
+        const requiredPassword = names.includes(urlState.name) ? getTallyPassword(urlState.name) : null;
+        if (requiredPassword) {
+          const input = prompt(`集計「${urlState.name}」のパスワードを入力してください`);
+          if (input !== requiredPassword) {
+            if (input !== null) alert('パスワードが違います');
+            urlRestoreBlocked = true;
+          }
         }
       }
     }
@@ -1145,7 +1170,9 @@
 
     // --- 共有機能 (QRコード・コピー) ---
     btnShare.addEventListener('click', () => {
-      const shareUrl = `${window.location.origin}${window.location.pathname}?n=${encodeURIComponent(activeName)}&c=${count}&p=${unitPrice}`;
+      const password = getTallyPassword(activeName);
+      const hashParam = password ? `&h=${hashPassword(password)}` : '';
+      const shareUrl = `${window.location.origin}${window.location.pathname}?n=${encodeURIComponent(activeName)}&c=${count}&p=${unitPrice}${hashParam}`;
       shareUrlInputEl.value = shareUrl;
       QRCodeGenerator.draw(shareUrl, qrCanvasEl, 5);
       shareModalEl.style.display = 'flex';
