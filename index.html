@@ -1065,6 +1065,18 @@
         nameSpan.addEventListener('click', () => switchTallyWithAuth(name));
         item.appendChild(nameSpan);
 
+        if (!getTallyPassword(name)) {
+          const setPasswordBtn = document.createElement('button');
+          setPasswordBtn.type = 'button';
+          setPasswordBtn.className = 'tally-delete-btn';
+          setPasswordBtn.textContent = 'パスワード設定';
+          setPasswordBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPasswordForTally(name);
+          });
+          item.appendChild(setPasswordBtn);
+        }
+
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'tally-delete-btn';
@@ -1077,6 +1089,18 @@
 
         tallyListEl.appendChild(item);
       });
+    }
+
+    // パスワード未設定の集計(デフォルトなど)に後からパスワードを付与する
+    function setPasswordForTally(name) {
+      const newPassword = prompt(`集計「${name}」に設定するパスワードを入力してください`);
+      if (newPassword === null) return;
+      if (!newPassword) {
+        alert('パスワードを設定してください');
+        return;
+      }
+      setTallyPassword(name, newPassword);
+      renderTallyList();
     }
 
     // 削除も切替と同じくパスワード必須(パスワード未設定分は無条件で許可)
