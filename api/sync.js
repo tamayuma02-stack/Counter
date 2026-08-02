@@ -1,6 +1,9 @@
 // チームのカウント状態をVercel KV(Upstash Redis)へ保存・取得する(同一チーム内の端末間引き継ぎ用)
 // 同名チームの2回目以降の書き込み・読み込みは、初回に記録したパスワードハッシュと一致する場合のみ許可する
 export default async function handler(req, res) {
+  // モバイル環境やCDNでのキャッシュにより削除・更新直後の結果が古いまま返るのを防ぐ
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+
   const kvUrl = process.env.KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN;
   if (!kvUrl || !kvToken) {

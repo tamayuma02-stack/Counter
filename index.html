@@ -956,7 +956,7 @@
     // サーバー(DB)へチームのパスワードを照合する。パスワード未設定のチームは入力なしでそのまま通る
     async function fetchTeamFromServer(name, passwordHash) {
       try {
-        const resp = await fetch(`/api/sync?name=${encodeURIComponent(name)}&passwordHash=${encodeURIComponent(passwordHash || '')}`);
+        const resp = await fetch(`/api/sync?name=${encodeURIComponent(name)}&passwordHash=${encodeURIComponent(passwordHash || '')}`, { cache: 'no-store' });
         if (resp.status === 404) return { status: 'notfound' };
         if (resp.status === 403) return { status: 'forbidden' };
         if (!resp.ok) return { status: 'error' };
@@ -1141,7 +1141,7 @@
     async function openSwitchModal() {
       let serverTeams = [];
       try {
-        const resp = await fetch('/api/sync?list=1');
+        const resp = await fetch('/api/sync?list=1', { cache: 'no-store' });
         if (resp.ok) {
           const data = await resp.json();
           serverTeams = data.teams || [];
@@ -1168,7 +1168,7 @@
       const password = getTallyPassword(targetName);
       const passwordHash = password ? hashPassword(password) : '';
       try {
-        const delResp = await fetch(`/api/sync?name=${encodeURIComponent(targetName)}&passwordHash=${encodeURIComponent(passwordHash)}`, { method: 'DELETE' });
+        const delResp = await fetch(`/api/sync?name=${encodeURIComponent(targetName)}&passwordHash=${encodeURIComponent(passwordHash)}`, { method: 'DELETE', cache: 'no-store' });
         if (delResp.status === 403) {
           alert('サーバー側に保存されているパスワードと一致しません');
           return;
@@ -1358,7 +1358,7 @@
 
       btnSync.disabled = true;
       try {
-        const getResp = await fetch(`/api/sync?name=${encodeURIComponent(activeName)}&passwordHash=${encodeURIComponent(passwordHash)}`);
+        const getResp = await fetch(`/api/sync?name=${encodeURIComponent(activeName)}&passwordHash=${encodeURIComponent(passwordHash)}`, { cache: 'no-store' });
 
         if (getResp.status === 403) {
           alert('サーバー側に保存されているパスワードと一致しません');
