@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カウンター &amp; 金額計算アプリ</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --secondary: #64748b;
+      --secondary-hover: #475569;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --accent: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .container {
+      background-color: var(--card-bg);
+      width: 100%;
+      max-width: 440px;
+      padding: 32px 24px;
+      border-radius: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      text-align: center;
+      color: var(--text-sub);
+      letter-spacing: 0.05em;
+    }
+
+    /* カウント数表示エリア */
+    .count-display {
+      text-align: center;
+      padding: 16px 0;
+    }
+
+    .count-number {
+      font-size: 5rem;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .count-label {
+      font-size: 0.875rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    /* 単価設定エリア */
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-group label {
+      font-size: 0.875rem;
+      color: var(--text-sub);
+    }
+
+    .price-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .price-input-wrapper input {
+      width: 100%;
+      padding: 14px 40px 14px 16px;
+      background-color: rgba(15, 23, 42, 0.6);
+      border: 2px solid #334155;
+      border-radius: 12px;
+      color: var(--text-main);
+      font-size: 1.125rem;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .price-input-wrapper input:focus {
+      border-color: var(--primary);
+    }
+
+    .price-input-wrapper .unit {
+      position: absolute;
+      right: 16px;
+      color: var(--text-sub);
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    /* 合計金額表示エリア */
+    .total-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.15));
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 20px;
+      border-radius: 16px;
+      text-align: center;
+    }
+
+    .total-label {
+      font-size: 0.875rem;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+
+    .total-amount {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ボタンエリア */
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .primary-btn {
+      width: 100%;
+      padding: 18px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #ffffff;
+      background-color: var(--primary);
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+      transition: background-color 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .primary-btn:active {
+      transform: scale(0.98);
+      background-color: var(--primary-hover);
+    }
+
+    .sub-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 14px 8px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      text-align: center;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .secondary-btn {
+      background-color: var(--secondary);
+      color: var(--text-main);
+    }
+
+    .secondary-btn:active {
+      background-color: var(--secondary-hover);
+    }
+
+    .share-btn {
+      background-color: rgba(59, 130, 246, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .share-btn:active {
+      background-color: var(--primary);
+      color: #ffffff;
+    }
+
+    .danger-btn {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .danger-btn:active {
+      background-color: var(--danger);
+      color: #ffffff;
+    }
+
+    /* 共有モーダルスタイル */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(4px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+
+    .modal-card {
+      background-color: var(--card-bg);
+      border: 1px solid #334155;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 360px;
+      padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-sub);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+    }
+
+    .close-btn:hover { color: var(--text-main); }
+
+    .qr-wrapper {
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+      background-color: #ffffff;
+      border-radius: 16px;
+    }
+
+    .qr-wrapper canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .share-url-box {
+      display: flex;
+      gap: 8px;
+    }
+
+    .share-url-box input {
+      flex: 1;
+      padding: 10px 12px;
+      background-color: rgba(15, 23, 42, 0.6);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: var(--text-sub);
+      font-size: 0.875rem;
+      outline: none;
+    }
+
+    .primary-btn-sm {
+      padding: 10px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background-color: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .toast-msg {
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>カウンター &amp; 単価計算</h1>
+
+    <!-- カウント表示 -->
+    <div class="count-display">
+      <div class="count-number" id="countVal">0</div>
+      <div class="count-label">現在のカウント</div>
+    </div>
+
+    <!-- 単価設定 -->
+    <div class="input-group">
+      <label for="priceInput">単価設定</label>
+      <div class="price-input-wrapper">
+        <input type="number" id="priceInput" min="0" placeholder="0" value="100">
+        <span class="unit">円</span>
+      </div>
+    </div>
+
+    <!-- 合計金額表示 -->
+    <div class="total-card">
+      <div class="total-label">合計金額</div>
+      <div class="total-amount" id="totalAmount">0 円</div>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div class="button-group">
+      <button type="button" class="primary-btn" id="btnPlus">+ 1</button>
+      <div class="sub-buttons">
+        <button type="button" class="btn secondary-btn" id="btnMinus">1つ戻す</button>
+        <button type="button" class="btn share-btn" id="btnShare">共有</button>
+        <button type="button" class="btn danger-btn" id="btnReset">リセット</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 共有モーダル -->
+  <div class="modal-overlay" id="shareModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>状態の共有 (QRコード)</h2>
+        <button type="button" class="close-btn" id="btnCloseModal">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="qr-wrapper">
+          <canvas id="qrCanvas"></canvas>
+        </div>
+        <div class="share-url-box">
+          <input type="text" id="shareUrlInput" readonly>
+          <button type="button" class="primary-btn-sm" id="btnCopy">コピー</button>
+        </div>
+        <div class="toast-msg" id="toastMsg" style="display: none;">URLをコピーしました！</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 完全自己完結 バニラJS QRコード生成エンジン ---
+    const QRCodeGenerator = (function() {
+      var QRMath = {
+        glog: function(n) { if (n < 1) throw new Error("glog"); return QRMath.LOG_TABLE[n]; },
+        gexp: function(n) { while (n < 0) n += 255; while (n >= 256) n -= 255; return QRMath.EXP_TABLE[n]; },
+        EXP_TABLE: new Array(256), LOG_TABLE: new Array(256)
+      };
+      for (var i = 0; i < 8; i++) QRMath.EXP_TABLE[i] = 1 << i;
+      for (var i = 8; i < 256; i++) QRMath.EXP_TABLE[i] = QRMath.EXP_TABLE[i - 4] ^ QRMath.EXP_TABLE[i - 5] ^ QRMath.EXP_TABLE[i - 8] ^ QRMath.EXP_TABLE[i - 1];
+      for (var i = 0; i < 255; i++) QRMath.LOG_TABLE[QRMath.EXP_TABLE[i]] = i;
+
+      function QRPolynomial(num, shift) {
+        var offset = 0;
+        while (offset < num.length && num[offset] == 0) offset++;
+        this.num = new Array(num.length - offset + shift);
+        for (var i = 0; i < num.length - offset; i++) this.num[i] = num[i + offset];
+      }
+      QRPolynomial.prototype = {
+        get: function(i) { return this.num[i]; },
+        getLength: function() { return this.num.length; },
+        multiply: function(e) {
+          var num = new Array(this.getLength() + e.getLength() - 1);
+          for (var i = 0; i < this.getLength(); i++) {
+            for (var j = 0; j < e.getLength(); j++) {
+              num[i + j] ^= QRMath.gexp(QRMath.glog(this.get(i)) + QRMath.glog(e.get(j)));
+            }
+          }
+          return new QRPolynomial(num, 0);
+        },
+        mod: function(e) {
+          if (this.getLength() - e.getLength() < 0) return this;
+          var ratio = QRMath.glog(this.get(0)) - QRMath.glog(e.get(0));
+          var num = new Array(this.getLength());
+          for (var i = 0; i < this.getLength(); i++) num[i] = this.get(i);
+          for (var i = 0; i < e.getLength(); i++) num[i] ^= QRMath.gexp(QRMath.glog(e.get(i)) + ratio);
+          return new QRPolynomial(num, 0).mod(e);
+        }
+      };
+
+      function RSBlock(totalCount, dataCount) { this.totalCount = totalCount; this.dataCount = dataCount; }
+      RSBlock.RS_BLOCK_TABLE = [
+        [1, 26, 19], [1, 26, 16], [1, 26, 13], [1, 26, 9],
+        [1, 44, 34], [1, 44, 28], [1, 44, 22], [1, 44, 16],
+        [1, 70, 55], [1, 70, 44], [2, 35, 17], [2, 35, 13],
+        [1, 100, 80], [2, 50, 32], [2, 50, 24], [4, 25, 9],
+        [1, 134, 108], [2, 67, 43], [2, 33, 15, 2, 34, 16], [2, 33, 11, 2, 34, 12],
+        [2, 43, 34], [4, 43, 27], [4, 43, 19], [4, 43, 15],
+        [2, 78, 62], [4, 78, 45], [2, 46, 20, 4, 47, 21], [4, 46, 14, 1, 47, 15],
+        [2, 97, 77], [2, 60, 47, 2, 61, 48], [4, 60, 24, 2, 61, 25], [4, 40, 15, 2, 41, 16],
+        [2, 116, 89], [3, 58, 36, 2, 59, 37], [4, 45, 15, 4, 46, 16], [4, 42, 13, 4, 43, 14],
+        [2, 68, 53, 2, 69, 54], [4, 69, 43, 1, 70, 44], [6, 43, 19, 2, 44, 20], [6, 43, 15, 2, 44, 16]
+      ];
+      RSBlock.getRSBlocks = function(typeNumber, ecl) {
+        var rsBlock = RSBlock.getRsBlockTable(typeNumber, ecl);
+        var list = [];
+        for (var i = 0; i < rsBlock.length; i += 3) {
+          for (var j = 0; j < rsBlock[i]; j++) list.push(new RSBlock(rsBlock[i + 1], rsBlock[i + 2]));
+        }
+        return list;
+      };
+      RSBlock.getRsBlockTable = function(typeNumber, ecl) {
+        var idx = (typeNumber - 1) * 4 + (ecl == 'M' ? 1 : ecl == 'Q' ? 2 : ecl == 'H' ? 3 : 0);
+        return RSBlock.RS_BLOCK_TABLE[idx];
+      };
+
+      function BitBuffer() { this.buffer = []; this.length = 0; }
+      BitBuffer.prototype = {
+        put: function(num, length) { for (var i = 0; i < length; i++) this.putBit(((num >>> (length - i - 1)) & 1) == 1); },
+        putBit: function(bit) {
+          var bufIndex = Math.floor(this.length / 8);
+          if (this.buffer.length <= bufIndex) this.buffer.push(0);
+          if (bit) this.buffer[bufIndex] |= (0x80 >>> (this.length % 8));
+          this.length++;
+        }
+      };
+
+      function QRCodeModel(typeNumber, ecl) {
+        this.typeNumber = typeNumber; this.ecl = ecl;
+        this.modules = null; this.moduleCount = 0; this.dataList = [];
+      }
+      QRCodeModel.prototype = {
+        addData: function(data) {
+          this.dataList.push({
+            data: data,
+            getLength: function() { return encodeURI(data).replace(/%../g, 'i').length; },
+            write: function(buffer) {
+              for (var i = 0; i < data.length; i++) {
+                var c = data.charCodeAt(i);
+                if (c < 0x80) buffer.put(c, 8);
+                else if (c < 0x800) { buffer.put(0xc0 | (c >> 6), 8); buffer.put(0x80 | (c & 0x3f), 8); }
+                else { buffer.put(0xe0 | (c >> 12), 8); buffer.put(0x80 | ((c >> 6) & 0x3f), 8); buffer.put(0x80 | (c & 0x3f), 8); }
+              }
+            }
+          });
+        },
+        make: function() {
+          var typeNumber = 1;
+          for (typeNumber = 1; typeNumber < 10; typeNumber++) {
+            var rsBlocks = RSBlock.getRSBlocks(typeNumber, this.ecl);
+            var buffer = new BitBuffer();
+            var totalDataCount = 0;
+            for (var i = 0; i < rsBlocks.length; i++) totalDataCount += rsBlocks[i].dataCount;
+            for (var i = 0; i < this.dataList.length; i++) {
+              var data = this.dataList[i];
+              buffer.put(4, 4);
+              buffer.put(data.getLength(), typeNumber < 10 ? 8 : 16);
+              data.write(buffer);
+            }
+            if (buffer.length <= totalDataCount * 8) break;
+          }
+          this.typeNumber = typeNumber;
+          this.makeImpl(false, 0);
+        },
+        makeImpl: function(test, maskPattern) {
+          this.moduleCount = this.typeNumber * 4 + 17;
+          this.modules = new Array(this.moduleCount);
+          for (var r = 0; r < this.moduleCount; r++) {
+            this.modules[r] = new Array(this.moduleCount);
+            for (var c = 0; c < this.moduleCount; c++) this.modules[r][c] = null;
+          }
+          this.setupPositionProbePattern(0, 0);
+          this.setupPositionProbePattern(this.moduleCount - 7, 0);
+          this.setupPositionProbePattern(0, this.moduleCount - 7);
+          this.setupTimingPattern();
+          this.setupTypeInfo(test, maskPattern);
+          var dataCache = QRCodeModel.createData(this.typeNumber, this.ecl, this.dataList);
+          this.mapData(dataCache, maskPattern);
+        },
+        setupPositionProbePattern: function(r, c) {
+          for (var row = -1; row <= 7; row++) {
+            if (r + row <= -1 || this.moduleCount <= r + row) continue;
+            for (var col = -1; col <= 7; col++) {
+              if (c + col <= -1 || this.moduleCount <= c + col) continue;
+              this.modules[r + row][c + col] = ((0 <= row && row <= 6 && (col == 0 || col == 6)) ||
+                (0 <= col && col <= 6 && (row == 0 || row == 6)) ||
+                (2 <= row && row <= 4 && 2 <= col && col <= 4));
+            }
+          }
+        },
+        setupTimingPattern: function() {
+          for (var r = 8; r < this.moduleCount - 8; r++) if (this.modules[r][6] == null) this.modules[r][6] = (r % 2 == 0);
+          for (var c = 8; c < this.moduleCount - 8; c++) if (this.modules[6][c] == null) this.modules[6][c] = (c % 2 == 0);
+        },
+        setupTypeInfo: function(test, maskPattern) {
+          var data = (0x5465 << 10) | maskPattern;
+          for (var i = 0; i < 15; i++) {
+            var mod = (!test && ((data >> i) & 1) == 1);
+            if (i < 6) this.modules[i][8] = mod;
+            else if (i < 8) this.modules[i + 1][8] = mod;
+            else this.modules[this.moduleCount - 15 + i][8] = mod;
+
+            if (i < 8) this.modules[8][this.moduleCount - i - 1] = mod;
+            else if (i < 9) this.modules[8][15 - i - 1 + 1] = mod;
+            else this.modules[8][15 - i - 1] = mod;
+          }
+          this.modules[this.moduleCount - 8][8] = (!test);
+        },
+        mapData: function(data, maskPattern) {
+          var inc = -1, row = this.moduleCount - 1, bitIndex = 7, byteIndex = 0;
+          for (var col = this.moduleCount - 1; col > 0; col -= 2) {
+            if (col == 6) col--;
+            while (true) {
+              for (var c = 0; c < 2; c++) {
+                if (this.modules[row][col - c] == null) {
+                  var dark = false;
+                  if (byteIndex < data.length) dark = (((data[byteIndex] >>> bitIndex) & 1) == 1);
+                  this.modules[row][col - c] = dark;
+                  bitIndex--;
+                  if (bitIndex == -1) { byteIndex++; bitIndex = 7; }
+                }
+              }
+              row += inc;
+              if (row < 0 || this.moduleCount <= row) { row -= inc; inc = -inc; break; }
+            }
+          }
+        }
+      };
+
+      QRCodeModel.createData = function(typeNumber, ecl, dataList) {
+        var rsBlocks = RSBlock.getRSBlocks(typeNumber, ecl);
+        var buffer = new BitBuffer();
+        for (var i = 0; i < dataList.length; i++) {
+          var data = dataList[i];
+          buffer.put(4, 4);
+          buffer.put(data.getLength(), typeNumber < 10 ? 8 : 16);
+          data.write(buffer);
+        }
+        var totalDataCount = 0;
+        for (var i = 0; i < rsBlocks.length; i++) totalDataCount += rsBlocks[i].dataCount;
+        if (buffer.length + 4 <= totalDataCount * 8) buffer.put(0, 4);
+        while (buffer.length % 8 != 0) buffer.putBit(false);
+        while (true) {
+          if (buffer.length >= totalDataCount * 8) break;
+          buffer.put(0xec, 8);
+          if (buffer.length >= totalDataCount * 8) break;
+          buffer.put(0x11, 8);
+        }
+        return QRCodeModel.createBytes(buffer, rsBlocks);
+      };
+
+      QRCodeModel.createBytes = function(buffer, rsBlocks) {
+        var offset = 0, maxDcCount = 0, maxEcCount = 0;
+        var dcdata = new Array(rsBlocks.length), ecdata = new Array(rsBlocks.length);
+        for (var r = 0; r < rsBlocks.length; r++) {
+          var dcCount = rsBlocks[r].dataCount;
+          var ecCount = rsBlocks[r].totalCount - dcCount;
+          maxDcCount = Math.max(maxDcCount, dcCount);
+          maxEcCount = Math.max(maxEcCount, ecCount);
+          dcdata[r] = new Array(dcCount);
+          for (var i = 0; i < dcdata[r].length; i++) dcdata[r][i] = 0xff & buffer.buffer[i + offset];
+          offset += dcCount;
+          var rsPoly = (function(len) {
+            var a = new QRPolynomial([1], 0);
+            for (var i = 0; i < len; i++) a = a.multiply(new QRPolynomial([1, QRMath.gexp(i)], 0));
+            return a;
+          })(ecCount);
+          var rawPoly = new QRPolynomial(dcdata[r], rsPoly.getLength() - 1);
+          var modPoly = rawPoly.mod(rsPoly);
+          ecdata[r] = new Array(rsPoly.getLength() - 1);
+          for (var i = 0; i < ecdata[r].length; i++) {
+            var modIndex = i + modPoly.getLength() - ecdata[r].length;
+            ecdata[r][i] = (modIndex >= 0) ? modPoly.get(modIndex) : 0;
+          }
+        }
+        var totalCodeCount = 0;
+        for (var i = 0; i < rsBlocks.length; i++) totalCodeCount += rsBlocks[i].totalCount;
+        var data = new Array(totalCodeCount), index = 0;
+        for (var i = 0; i < maxDcCount; i++) for (var r = 0; r < rsBlocks.length; r++) if (i < dcdata[r].length) data[index++] = dcdata[r][i];
+        for (var i = 0; i < maxEcCount; i++) for (var r = 0; r < rsBlocks.length; r++) if (i < ecdata[r].length) data[index++] = ecdata[r][i];
+        return data;
+      };
+
+      return {
+        draw: function(text, canvas, cellSize) {
+          cellSize = cellSize || 5;
+          var qr = new QRCodeModel(0, 'M');
+          qr.addData(text);
+          qr.make();
+          var count = qr.moduleCount;
+          var margin = cellSize * 2;
+          canvas.width = count * cellSize + margin * 2;
+          canvas.height = count * cellSize + margin * 2;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#0f172a';
+          for (var r = 0; r < count; r++) {
+            for (var c = 0; c < count; c++) {
+              if (qr.modules[r][c]) {
+                ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
+              }
+            }
+          }
+        }
+      };
+    })();
+
+
+    // --- アプリケーションロジック & 状態管理 ---
+    const STORAGE_KEY = 'counterAppState';
+
+    // URLクエリパラメータ(?c=...&p=...)の復元とバリデーション
+    function restoreFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const cParam = params.get('c');
+      const pParam = params.get('p');
+      let restored = false;
+      let cVal = null;
+      let pVal = null;
+
+      if (cParam !== null) {
+        const numC = Number(cParam);
+        if (!isNaN(numC) && Number.isInteger(numC) && numC >= 0) {
+          cVal = numC;
+          restored = true;
+        }
+      }
+
+      if (pParam !== null) {
+        const numP = Number(pParam);
+        if (!isNaN(numP) && numP >= 0) {
+          pVal = numP;
+          restored = true;
+        }
+      }
+
+      // クエリパラメータがあればURLから除去し、素のURLに戻す
+      if (cParam !== null || pParam !== null) {
+        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+
+      return restored ? { count: cVal, unitPrice: pVal } : null;
+    }
+
+    // localStorageからの状態取得
+    function loadSavedState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return {
+          count: Number.isFinite(saved?.count) && saved.count >= 0 ? saved.count : 0,
+          unitPrice: Number.isFinite(saved?.unitPrice) && saved.unitPrice >= 0 ? saved.unitPrice : 100,
+        };
+      } catch {
+        return { count: 0, unitPrice: 100 };
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ count, unitPrice }));
+    }
+
+    // 初期状態設定（URL復元優先 -> localStorage -> デフォルト値）
+    const savedState = loadSavedState();
+    const urlState = restoreFromUrl();
+
+    let count = (urlState && urlState.count !== null) ? urlState.count : savedState.count;
+    let unitPrice = (urlState && urlState.unitPrice !== null) ? urlState.unitPrice : savedState.unitPrice;
+
+    // DOM要素の参照
+    const countValEl = document.getElementById('countVal');
+    const priceInputEl = document.getElementById('priceInput');
+    const totalAmountEl = document.getElementById('totalAmount');
+    const btnPlus = document.getElementById('btnPlus');
+    const btnMinus = document.getElementById('btnMinus');
+    const btnReset = document.getElementById('btnReset');
+    const btnShare = document.getElementById('btnShare');
+
+    const shareModalEl = document.getElementById('shareModal');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const shareUrlInputEl = document.getElementById('shareUrlInput');
+    const qrCanvasEl = document.getElementById('qrCanvas');
+    const btnCopy = document.getElementById('btnCopy');
+    const toastMsgEl = document.getElementById('toastMsg');
+
+    priceInputEl.value = unitPrice;
+
+    // 画面更新関数
+    function updateDisplay() {
+      countValEl.textContent = count;
+      const total = count * unitPrice;
+      totalAmountEl.textContent = total.toLocaleString('ja-JP') + ' 円';
+      saveState();
+    }
+
+    // ボタンイベントハンドラ
+    btnPlus.addEventListener('click', () => {
+      count++;
+      updateDisplay();
+    });
+
+    btnMinus.addEventListener('click', () => {
+      if (count > 0) {
+        count--;
+        updateDisplay();
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      if (confirm('カウントをリセットしますか？')) {
+        count = 0;
+        updateDisplay();
+      }
+    });
+
+    priceInputEl.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      unitPrice = isNaN(val) || val < 0 ? 0 : val;
+      updateDisplay();
+    });
+
+    // 共有機能（モーダル表示・QR描画）
+    btnShare.addEventListener('click', () => {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?c=${count}&p=${unitPrice}`;
+      shareUrlInputEl.value = shareUrl;
+      QRCodeGenerator.draw(shareUrl, qrCanvasEl, 5);
+      shareModalEl.style.display = 'flex';
+    });
+
+    btnCloseModal.addEventListener('click', () => {
+      shareModalEl.style.display = 'none';
+      toastMsgEl.style.display = 'none';
+    });
+
+    shareModalEl.addEventListener('click', (e) => {
+      if (e.target === shareModalEl) {
+        shareModalEl.style.display = 'none';
+        toastMsgEl.style.display = 'none';
+      }
+    });
+
+    // クリップボードコピー処理
+    btnCopy.addEventListener('click', () => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrlInputEl.value).then(showToast).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+    });
+
+    function fallbackCopy() {
+      shareUrlInputEl.select();
+      document.execCommand('copy');
+      showToast();
+    }
+
+    function showToast() {
+      toastMsgEl.style.display = 'block';
+      setTimeout(() => { toastMsgEl.style.display = 'none'; }, 2000);
+    }
+
+    // 初回表示
+    updateDisplay();
+  </script>
+</body>
+</html>
