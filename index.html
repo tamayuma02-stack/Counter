@@ -45,7 +45,7 @@
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
     }
 
     h1 {
@@ -56,10 +56,52 @@
       letter-spacing: 0.05em;
     }
 
+    /* 現在の集計名表示バー */
+    .tally-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(15, 23, 42, 0.4);
+      border: 1px solid #334155;
+      padding: 10px 16px;
+      border-radius: 12px;
+    }
+
+    .tally-label {
+      font-size: 0.875rem;
+      color: var(--text-sub);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-right: 8px;
+    }
+
+    .tally-label strong {
+      color: var(--text-main);
+      font-size: 1rem;
+      margin-left: 4px;
+    }
+
+    .secondary-btn-sm {
+      padding: 6px 12px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      background-color: var(--secondary);
+      color: var(--text-main);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .secondary-btn-sm:active {
+      background-color: var(--secondary-hover);
+    }
+
     /* カウント数表示エリア */
     .count-display {
       text-align: center;
-      padding: 16px 0;
+      padding: 12px 0;
     }
 
     .count-number {
@@ -221,7 +263,7 @@
       color: #ffffff;
     }
 
-    /* 共有モーダルスタイル */
+    /* モーダル共通スタイル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -319,12 +361,65 @@
       color: var(--accent);
       font-weight: 600;
     }
+
+    /* 集計切替モーダルスタイル */
+    .tally-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .tally-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background-color: rgba(15, 23, 42, 0.6);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: var(--text-main);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+
+    .tally-item:hover {
+      border-color: var(--primary);
+    }
+
+    .tally-item.active {
+      background-color: rgba(59, 130, 246, 0.2);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .tally-item-name {
+      flex: 1;
+    }
+
+    .tally-delete-btn {
+      background: none;
+      border: none;
+      color: var(--danger);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
 
   <div class="container">
     <h1>カウンター &amp; 単価計算</h1>
+
+    <!-- 集計名表示バー -->
+    <div class="tally-bar">
+      <div class="tally-label">集計: <strong id="tallyNameDisplay">デフォルト</strong></div>
+      <button type="button" class="secondary-btn-sm" id="btnOpenSwitchModal">切替</button>
+    </div>
 
     <!-- カウント表示 -->
     <div class="count-display">
@@ -358,6 +453,31 @@
     </div>
   </div>
 
+  <!-- 集計切替モーダル -->
+  <div class="modal-overlay" id="switchModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>集計の切替・新規作成</h2>
+        <button type="button" class="close-btn" id="btnCloseSwitchModal">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label style="font-size: 0.875rem; color: var(--text-sub); display: block; margin-bottom: 8px;">集計一覧</label>
+          <div class="tally-list" id="tallyList"></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label for="newTallyInput" style="font-size: 0.875rem; color: var(--text-sub);">新しい集計名</label>
+          <input type="text" id="newTallyInput" placeholder="例: わなげ" maxlength="12" style="padding: 10px 12px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 8px; color: var(--text-main); outline: none;">
+          <label for="newTallyPasswordInput" style="font-size: 0.875rem; color: var(--text-sub);">パスワード（切替のたびに必要）</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="password" id="newTallyPasswordInput" placeholder="パスワードを設定" style="flex: 1; padding: 10px 12px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 8px; color: var(--text-main); outline: none;">
+            <button type="button" class="primary-btn-sm" id="btnCreateTally">作成して切替</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 共有モーダル -->
   <div class="modal-overlay" id="shareModal" style="display: none;">
     <div class="modal-card">
@@ -379,7 +499,7 @@
   </div>
 
   <script>
-    // --- 完全自己完結 バニラJS QRコード生成エンジン ---
+    // --- 完全自己完結 バニラJS QRコード生成エンジン (変更なし) ---
     const QRCodeGenerator = (function() {
       var QRMath = {
         glog: function(n) { if (n < 1) throw new Error("glog"); return QRMath.LOG_TABLE[n]; },
@@ -390,7 +510,6 @@
       for (var i = 8; i < 256; i++) QRMath.EXP_TABLE[i] = QRMath.EXP_TABLE[i - 4] ^ QRMath.EXP_TABLE[i - 5] ^ QRMath.EXP_TABLE[i - 6] ^ QRMath.EXP_TABLE[i - 8];
       for (var i = 0; i < 255; i++) QRMath.LOG_TABLE[QRMath.EXP_TABLE[i]] = i;
 
-      // フォーマット情報(誤り訂正レベル+マスクパターン)のBCH(15,5)符号化
       var G15 = 0x537, G15_MASK = 0x5412;
       function getBCHDigit(data) { var digit = 0; while (data != 0) { digit++; data >>>= 1; } return digit; }
       function getBCHTypeInfo(data) {
@@ -398,8 +517,15 @@
         while (getBCHDigit(d) - getBCHDigit(G15) >= 0) d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15)));
         return ((data << 10) | d) ^ G15_MASK;
       }
-      // マスクパターン0: (row+col)%2==0 のモジュールを反転
       function applyMask0(row, col, dark) { return (row + col) % 2 == 0 ? !dark : dark; }
+
+      // バージョン情報(バージョン7以上で必須)のBCH(18,6)符号化
+      var G18 = 0x1F25;
+      function getBCHTypeNumber(typeNumber) {
+        var d = typeNumber << 12;
+        while (getBCHDigit(d) - getBCHDigit(G18) >= 0) d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18)));
+        return (typeNumber << 12) | d;
+      }
 
       function QRPolynomial(num, shift) {
         var offset = 0;
@@ -429,9 +555,8 @@
         }
       };
 
-      // アライメントパターンの中心座標テーブル（バージョン1〜9。1は無し）
       var PATTERN_POSITION_TABLE = [
-        [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46]
+        [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]
       ];
 
       function RSBlock(totalCount, dataCount) { this.totalCount = totalCount; this.dataCount = dataCount; }
@@ -441,11 +566,11 @@
         [1, 70, 55], [1, 70, 44], [2, 35, 17], [2, 35, 13],
         [1, 100, 80], [2, 50, 32], [2, 50, 24], [4, 25, 9],
         [1, 134, 108], [2, 67, 43], [2, 33, 15, 2, 34, 16], [2, 33, 11, 2, 34, 12],
-        [2, 43, 34], [4, 43, 27], [4, 43, 19], [4, 43, 15],
-        [2, 78, 62], [4, 78, 45], [2, 46, 20, 4, 47, 21], [4, 46, 14, 1, 47, 15],
-        [2, 97, 77], [2, 60, 47, 2, 61, 48], [4, 60, 24, 2, 61, 25], [4, 40, 15, 2, 41, 16],
-        [2, 116, 89], [3, 58, 36, 2, 59, 37], [4, 45, 15, 4, 46, 16], [4, 42, 13, 4, 43, 14],
-        [2, 68, 53, 2, 69, 54], [4, 69, 43, 1, 70, 44], [6, 43, 19, 2, 44, 20], [6, 43, 15, 2, 44, 16]
+        [2, 86, 68], [4, 43, 27], [4, 43, 19], [4, 43, 15],
+        [2, 98, 78], [4, 49, 31], [2, 32, 14, 4, 33, 15], [4, 39, 13, 1, 40, 14],
+        [2, 121, 97], [2, 60, 38, 2, 61, 39], [4, 40, 18, 2, 41, 19], [4, 40, 14, 2, 41, 15],
+        [2, 146, 116], [3, 58, 36, 2, 59, 37], [4, 36, 16, 4, 37, 17], [4, 36, 12, 4, 37, 13],
+        [2, 86, 68, 2, 87, 69], [4, 69, 43, 1, 70, 44], [6, 43, 19, 2, 44, 20], [6, 43, 15, 2, 44, 16]
       ];
       RSBlock.getRSBlocks = function(typeNumber, ecl) {
         var rsBlock = RSBlock.getRsBlockTable(typeNumber, ecl);
@@ -492,7 +617,7 @@
         },
         make: function() {
           var typeNumber = 1;
-          for (typeNumber = 1; typeNumber < 10; typeNumber++) {
+          for (typeNumber = 1; typeNumber <= 10; typeNumber++) {
             var rsBlocks = RSBlock.getRSBlocks(typeNumber, this.ecl);
             var buffer = new BitBuffer();
             var totalDataCount = 0;
@@ -520,9 +645,21 @@
           this.setupPositionProbePattern(0, this.moduleCount - 7);
           this.setupPositionAdjustPattern();
           this.setupTimingPattern();
+          if (this.typeNumber >= 7) this.setupTypeNumber(test);
           this.setupTypeInfo(test, maskPattern);
           var dataCache = QRCodeModel.createData(this.typeNumber, this.ecl, this.dataList);
           this.mapData(dataCache, maskPattern);
+        },
+        setupTypeNumber: function(test) {
+          var bits = getBCHTypeNumber(this.typeNumber);
+          for (var i = 0; i < 18; i++) {
+            var mod = (!test && ((bits >> i) & 1) == 1);
+            this.modules[Math.floor(i / 3)][i % 3 + this.moduleCount - 8 - 3] = mod;
+          }
+          for (var i = 0; i < 18; i++) {
+            var mod = (!test && ((bits >> i) & 1) == 1);
+            this.modules[i % 3 + this.moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+          }
         },
         setupPositionProbePattern: function(r, c) {
           for (var row = -1; row <= 7; row++) {
@@ -554,7 +691,6 @@
           for (var c = 8; c < this.moduleCount - 8; c++) if (this.modules[6][c] == null) this.modules[6][c] = (c % 2 == 0);
         },
         setupTypeInfo: function(test, maskPattern) {
-          // 誤り訂正レベルMのビット値は0b00
           var data = getBCHTypeInfo((0 << 3) | maskPattern);
           for (var i = 0; i < 15; i++) {
             var mod = (!test && ((data >> i) & 1) == 1);
@@ -668,48 +804,67 @@
       };
     })();
 
+    // --- ストレージキー定数 ---
+    const KEY_NAMES = 'counterTallyNames';
+    const KEY_ACTIVE = 'counterTallyActiveName';
+    const KEY_STATE_PREFIX = 'counterTallyState:';
+    const KEY_PASSWORD_PREFIX = 'counterTallyPassword:';
+    const OLD_KEY = 'counterAppState';
 
-    // --- アプリケーションロジック & 状態管理 ---
-    const STORAGE_KEY = 'counterAppState';
+    // --- 移行処理とストレージアクセサー ---
+    function migrateAndInitData() {
+      const rawNames = localStorage.getItem(KEY_NAMES);
+      if (rawNames === null) {
+        // 旧キーからのデータ移行、または完全初期データ構築
+        let initialCount = 0;
+        let initialUnitPrice = 100;
+        try {
+          const oldData = JSON.parse(localStorage.getItem(OLD_KEY));
+          if (oldData) {
+            if (Number.isFinite(oldData.count) && oldData.count >= 0) initialCount = oldData.count;
+            if (Number.isFinite(oldData.unitPrice) && oldData.unitPrice >= 0) initialUnitPrice = oldData.unitPrice;
+          }
+        } catch {}
 
-    // URLクエリパラメータ(?c=...&p=...)の復元とバリデーション
-    function restoreFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      const cParam = params.get('c');
-      const pParam = params.get('p');
-      let restored = false;
-      let cVal = null;
-      let pVal = null;
-
-      if (cParam !== null) {
-        const numC = Number(cParam);
-        if (!isNaN(numC) && Number.isInteger(numC) && numC >= 0) {
-          cVal = numC;
-          restored = true;
-        }
+        localStorage.setItem(KEY_NAMES, JSON.stringify(['デフォルト']));
+        localStorage.setItem(KEY_ACTIVE, 'デフォルト');
+        localStorage.setItem(KEY_STATE_PREFIX + 'デフォルト', JSON.stringify({ count: initialCount, unitPrice: initialUnitPrice }));
       }
-
-      if (pParam !== null) {
-        const numP = Number(pParam);
-        if (!isNaN(numP) && numP >= 0) {
-          pVal = numP;
-          restored = true;
-        }
-      }
-
-      // クエリパラメータがあればURLから除去し、素のURLに戻す
-      if (cParam !== null || pParam !== null) {
-        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
-        window.history.replaceState({}, document.title, cleanUrl);
-      }
-
-      return restored ? { count: cVal, unitPrice: pVal } : null;
     }
 
-    // localStorageからの状態取得
-    function loadSavedState() {
+    function getTallyNames() {
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        const names = JSON.parse(localStorage.getItem(KEY_NAMES));
+        return Array.isArray(names) && names.length > 0 ? names : ['デフォルト'];
+      } catch {
+        return ['デフォルト'];
+      }
+    }
+
+    function setTallyNames(names) {
+      localStorage.setItem(KEY_NAMES, JSON.stringify(names));
+    }
+
+    function getActiveName() {
+      return localStorage.getItem(KEY_ACTIVE) || 'デフォルト';
+    }
+
+    function setActiveName(name) {
+      localStorage.setItem(KEY_ACTIVE, name);
+    }
+
+    // パスワード未設定(初回移行分など)はnullを返す。切替時はnullなら無条件で通す
+    function getTallyPassword(name) {
+      return localStorage.getItem(KEY_PASSWORD_PREFIX + name);
+    }
+
+    function setTallyPassword(name, password) {
+      localStorage.setItem(KEY_PASSWORD_PREFIX + name, password);
+    }
+
+    function getTallyState(name) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(KEY_STATE_PREFIX + name));
         return {
           count: Number.isFinite(saved?.count) && saved.count >= 0 ? saved.count : 0,
           unitPrice: Number.isFinite(saved?.unitPrice) && saved.unitPrice >= 0 ? saved.unitPrice : 100,
@@ -719,18 +874,85 @@
       }
     }
 
-    function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ count, unitPrice }));
+    function setTallyState(name, state) {
+      localStorage.setItem(KEY_STATE_PREFIX + name, JSON.stringify(state));
     }
 
-    // 初期状態設定（URL復元優先 -> localStorage -> デフォルト値）
-    const savedState = loadSavedState();
+    // --- URLクエリパラメータ解析 & 復元 ---
+    function restoreFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const nameParam = params.get('n');
+      const cParam = params.get('c');
+      const pParam = params.get('p');
+
+      let restoredName = null;
+      let cVal = null;
+      let pVal = null;
+      let hasUrlParams = false;
+
+      if (nameParam !== null && nameParam.trim() !== '') {
+        restoredName = nameParam.trim();
+        hasUrlParams = true;
+      }
+
+      if (cParam !== null) {
+        const numC = Number(cParam);
+        if (!isNaN(numC) && Number.isInteger(numC) && numC >= 0) {
+          cVal = numC;
+          hasUrlParams = true;
+        }
+      }
+
+      if (pParam !== null) {
+        const numP = Number(pParam);
+        if (!isNaN(numP) && numP >= 0) {
+          pVal = numP;
+          hasUrlParams = true;
+        }
+      }
+
+      // パラメータが存在した場合、URLをクリーンアップ
+      if (nameParam !== null || cParam !== null || pParam !== null) {
+        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+
+      return hasUrlParams ? { name: restoredName, count: cVal, unitPrice: pVal } : null;
+    }
+
+    // --- アプリ初期化 ---
+    migrateAndInitData();
     const urlState = restoreFromUrl();
 
-    let count = (urlState && urlState.count !== null) ? urlState.count : savedState.count;
-    let unitPrice = (urlState && urlState.unitPrice !== null) ? urlState.unitPrice : savedState.unitPrice;
+    let names = getTallyNames();
+    let activeName = getActiveName();
 
-    // DOM要素の参照
+    // URL共有から開かれた場合の復元・新規追加・アクティブ化
+    if (urlState) {
+      if (urlState.name) {
+        activeName = urlState.name;
+        if (!names.includes(activeName)) {
+          names.push(activeName);
+          setTallyNames(names);
+        }
+      }
+
+      const currentState = getTallyState(activeName);
+      const updatedCount = (urlState.count !== null) ? urlState.count : currentState.count;
+      const updatedUnitPrice = (urlState.unitPrice !== null) ? urlState.unitPrice : currentState.unitPrice;
+      
+      setTallyState(activeName, { count: updatedCount, unitPrice: updatedUnitPrice });
+      setActiveName(activeName);
+    }
+
+    // アクティブな状態の読み込み
+    let activeState = getTallyState(activeName);
+    let count = activeState.count;
+    let unitPrice = activeState.unitPrice;
+
+    // --- DOM要素の参照 ---
+    const tallyNameDisplayEl = document.getElementById('tallyNameDisplay');
+    const btnOpenSwitchModal = document.getElementById('btnOpenSwitchModal');
     const countValEl = document.getElementById('countVal');
     const priceInputEl = document.getElementById('priceInput');
     const totalAmountEl = document.getElementById('totalAmount');
@@ -738,6 +960,13 @@
     const btnMinus = document.getElementById('btnMinus');
     const btnReset = document.getElementById('btnReset');
     const btnShare = document.getElementById('btnShare');
+
+    const switchModalEl = document.getElementById('switchModal');
+    const btnCloseSwitchModal = document.getElementById('btnCloseSwitchModal');
+    const tallyListEl = document.getElementById('tallyList');
+    const newTallyInputEl = document.getElementById('newTallyInput');
+    const newTallyPasswordInputEl = document.getElementById('newTallyPasswordInput');
+    const btnCreateTally = document.getElementById('btnCreateTally');
 
     const shareModalEl = document.getElementById('shareModal');
     const btnCloseModal = document.getElementById('btnCloseModal');
@@ -748,15 +977,16 @@
 
     priceInputEl.value = unitPrice;
 
-    // 画面更新関数
+    // 表示更新関数
     function updateDisplay() {
+      tallyNameDisplayEl.textContent = activeName;
       countValEl.textContent = count;
       const total = count * unitPrice;
       totalAmountEl.textContent = total.toLocaleString('ja-JP') + ' 円';
-      saveState();
+      setTallyState(activeName, { count, unitPrice });
     }
 
-    // ボタンイベントハンドラ
+    // --- ボタンイベントハンドラ ---
     btnPlus.addEventListener('click', () => {
       count++;
       updateDisplay();
@@ -770,7 +1000,7 @@
     });
 
     btnReset.addEventListener('click', () => {
-      if (confirm('カウントをリセットしますか？')) {
+      if (confirm(`集計「${activeName}」のカウントをリセットしますか？`)) {
         count = 0;
         updateDisplay();
       }
@@ -782,9 +1012,126 @@
       updateDisplay();
     });
 
-    // 共有機能（モーダル表示・QR描画）
+    // --- 集計切替・作成機能 ---
+    function renderTallyList() {
+      tallyListEl.innerHTML = '';
+      const currentNames = getTallyNames();
+      currentNames.forEach(name => {
+        const item = document.createElement('div');
+        item.className = 'tally-item' + (name === activeName ? ' active' : '');
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'tally-item-name';
+        nameSpan.textContent = name;
+        nameSpan.addEventListener('click', () => switchTallyWithAuth(name));
+        item.appendChild(nameSpan);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'tally-delete-btn';
+        deleteBtn.textContent = '削除';
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteTallyWithAuth(name);
+        });
+        item.appendChild(deleteBtn);
+
+        tallyListEl.appendChild(item);
+      });
+    }
+
+    // 削除も切替と同じくパスワード必須(パスワード未設定分は無条件で許可)
+    function deleteTallyWithAuth(targetName) {
+      const currentNames = getTallyNames();
+      if (currentNames.length <= 1) {
+        alert('最後の1件は削除できません');
+        return;
+      }
+      const requiredPassword = getTallyPassword(targetName);
+      if (requiredPassword) {
+        const input = prompt(`集計「${targetName}」のパスワードを入力してください`);
+        if (input === null) return;
+        if (input !== requiredPassword) {
+          alert('パスワードが違います');
+          return;
+        }
+      }
+      if (!confirm(`集計「${targetName}」を削除しますか？この操作は元に戻せません`)) return;
+
+      const updatedNames = currentNames.filter(n => n !== targetName);
+      setTallyNames(updatedNames);
+      localStorage.removeItem(KEY_STATE_PREFIX + targetName);
+      localStorage.removeItem(KEY_PASSWORD_PREFIX + targetName);
+
+      if (activeName === targetName) {
+        switchTally(updatedNames[0]);
+      } else {
+        renderTallyList();
+      }
+    }
+
+    // パスワード未設定の集計(旧データからの移行分など)はそのまま切替を許可する
+    function switchTallyWithAuth(targetName) {
+      const requiredPassword = getTallyPassword(targetName);
+      if (requiredPassword) {
+        const input = prompt(`集計「${targetName}」のパスワードを入力してください`);
+        if (input === null) return;
+        if (input !== requiredPassword) {
+          alert('パスワードが違います');
+          return;
+        }
+      }
+      switchTally(targetName);
+    }
+
+    function switchTally(targetName) {
+      activeName = targetName;
+      setActiveName(activeName);
+      const state = getTallyState(activeName);
+      count = state.count;
+      unitPrice = state.unitPrice;
+      priceInputEl.value = unitPrice;
+      updateDisplay();
+      switchModalEl.style.display = 'none';
+    }
+
+    btnOpenSwitchModal.addEventListener('click', () => {
+      renderTallyList();
+      newTallyInputEl.value = '';
+      newTallyPasswordInputEl.value = '';
+      switchModalEl.style.display = 'flex';
+    });
+
+    btnCloseSwitchModal.addEventListener('click', () => {
+      switchModalEl.style.display = 'none';
+    });
+
+    switchModalEl.addEventListener('click', (e) => {
+      if (e.target === switchModalEl) switchModalEl.style.display = 'none';
+    });
+
+    btnCreateTally.addEventListener('click', () => {
+      const newName = newTallyInputEl.value.trim();
+      if (!newName) return;
+
+      const currentNames = getTallyNames();
+      if (!currentNames.includes(newName)) {
+        const newPassword = newTallyPasswordInputEl.value;
+        if (!newPassword) {
+          alert('パスワードを設定してください');
+          return;
+        }
+        currentNames.push(newName);
+        setTallyNames(currentNames);
+        setTallyState(newName, { count: 0, unitPrice: 100 });
+        setTallyPassword(newName, newPassword);
+      }
+      switchTally(newName);
+    });
+
+    // --- 共有機能 (QRコード・コピー) ---
     btnShare.addEventListener('click', () => {
-      const shareUrl = `${window.location.origin}${window.location.pathname}?c=${count}&p=${unitPrice}`;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?n=${encodeURIComponent(activeName)}&c=${count}&p=${unitPrice}`;
       shareUrlInputEl.value = shareUrl;
       QRCodeGenerator.draw(shareUrl, qrCanvasEl, 5);
       shareModalEl.style.display = 'flex';
@@ -802,7 +1149,6 @@
       }
     });
 
-    // クリップボードコピー処理
     btnCopy.addEventListener('click', () => {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(shareUrlInputEl.value).then(showToast).catch(fallbackCopy);
@@ -822,7 +1168,7 @@
       setTimeout(() => { toastMsgEl.style.display = 'none'; }, 2000);
     }
 
-    // 初回表示
+    // 初回描画
     updateDisplay();
   </script>
 </body>
